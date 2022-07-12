@@ -1,12 +1,12 @@
 # Analysis of NFTMarketplace contract
 
 ## 1. No validation that the poster of a sell order is the actual owner of the NFT
-#### Description
+### Description
 When calling the `postSellOrder` function, the function only checks that the NFT id sent is valid but not that is belongs to the `msg.sender`. 
 
 This allows anyone to post a sell order for any NFT id, even if a sell order has already been posted for that NFT since the contract associate only one NFT id to one sell order (`mapping(uint256 => Order) public sellOrder` line 89).
 
-#### Code
+### Code
 ```
 function postSellOrder(uint256 nftId, uint256 amount)
     external
@@ -36,7 +36,7 @@ function postSellOrder(uint256 nftId, uint256 amount)
 }
 ```
 
-#### Recommendations
+### Recommendations
 **Immediate:** Add a `require()` directive checking that the `msg.sender` is the actual owner of the NFT like the following:
 ```
 require(
@@ -48,14 +48,14 @@ require(
 - Consider using an approval system for posting selling orders *or* validating buy orders that would require an additional step from the owner before sending the NFT.
 
 ## 2. Overwriting of a sell order leads to exfiltration of the NFT
-#### Description
-As a consequence of [1.](#1-No-validation-that-the-poster-of-a-sell-order-is-the-actual-owner-of-the-NFT), when calling the `postSellOrder` function the sell order for the `nftId` will be overwritten.
+### Description
+As a consequence of [[1]](#1-No-validation-that-the-poster-of-a-sell-order-is-the-actual-owner-of-the-NFT), when calling the `postSellOrder` function the sell order for the `nftId` will be overwritten.
 
 This allows the poster to then cancel the order through the `cancelSellOrder` function which doesn't check that the `msg.sender` is the owner of the NFT but only if it's the owner of the sell order. 
 
 Hence, an attacker can steal any NFT listed on the marketplace.
 
-#### Code
+### Code
 ```
 function cancelSellOrder(uint256 nftId) external nonReentrant {
     Order storage order = sellOrder[nftId];
@@ -82,7 +82,7 @@ function cancelSellOrder(uint256 nftId) external nonReentrant {
 }
 ```
 
-#### Recommendations
+### Recommendations
 **Immediate:** Add a `require()` directive checking that the `msg.sender` is the actual owner of the NFT like the following:
 ```
 require(
@@ -91,15 +91,78 @@ require(
     );
 ```
 **Future:**
-- Fixing [1.](#1-No-validation-that-the-poster-of-a-sell-order-is-the-actual-owner-of-the-NFT) will fix this vulnerability as well.
+- Fixing [[1]](#1-No-validation-that-the-poster-of-a-sell-order-is-the-actual-owner-of-the-NFT) will fix this vulnerability as well.
 
-## 3.
-#### Description
+## 3. Wrong check allows for decreasing fulfilled or cancelled orders amounts, leading to siphoning of funds
+### Description
+The `decreaseBuyOrder` function contains a logic bug in its check for ensuring that only `Listed` orders' amount can be decreased.
+```
+require(
+    order.status != OrderStatus.Cancelled ||
+        order.status != OrderStatus.Fulfilled,
+    "Order should be listed"
+);
+```
+should be
+```
+require(
+    order.status != OrderStatus.Cancelled &&
+        order.status != OrderStatus.Fulfilled,
+    "Order should be listed"
+);
+```
+or simply
+```
+require(
+    order.status == OrderStatus.Listed,
+    "Order should be listed"
+);
+```
 
-#### Code
+This bug allows for an attacker to submit a buy order, cancel it to get refunded and then descrease its amount to withdraw additional tokens from the contract.
 
-#### Recommendations
-**Immediate:**
+This can be repeated until one token remains in the balance of the marketplace as the strict equality (`require(decreaseAmount > 0, "decreaseAmount > 0")` line 267) won't allow to post an 1 token order and decrease its value.
 
+Note that this also affects the `increaseBuyOrder` function although no direct exploitation of the bug is possible in this case. 
+### Code
+```
+function decreaseBuyOrder(uint256 orderId, uint256 decreaseAmount)
+    external
+    nonReentrant
+{
+    require(decreaseAmount > 0, "decreaseAmount > 0");
+    Order storage order = buyOrders[orderId];
+    require(
+        order.amount > decreaseAmount,
+        "order.amount > decreaseAmount"
+    );
+    // Can not be a cancelled or fulfilled order
+    require(
+        order.status != OrderStatus.Cancelled ||
+            order.status != OrderStatus.Fulfilled,
+        "Order should be listed"
+    );
+    require(
+        order.owner == _msgSender(),
+        "Caller must own the buy order"
+    );
+    require(
+        ApeCoin.transfer(_msgSender(), decreaseAmount),
+        "ApeCoin transfer failed"
+    );
+
+    ...
+}
+```
+
+### Recommendations
+**Immediate:** Change the require check (line 274 to 278 and line 240 to 244) to the following:
+```
+require(
+    order.status == OrderStatus.Listed,
+    "Order should be listed"
+);
+```
 **Future:**
-- 
+- Carefully review the flow of execution and `require` statements of critical functions (handling funds, ownership, etc.).
+- Consider using a [formal verification tool](https://github.com/leonardoalt/ethereum_formal_verification_overview#solidity) for asserting function's behavior before deploying smart contracts.
