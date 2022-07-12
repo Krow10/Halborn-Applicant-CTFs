@@ -1,5 +1,10 @@
 # Analysis of NFTMarketplace contract
 
+## Table of Contents
+1. [No validation that the poster of a sell order is the actual owner of the NFT](#1-No-validation-that-the-poster-of-a-sell-order-is-the-actual-owner-of-the-NFT)
+2. [Overwriting of a sell order leads to exfiltration of the NFT](#2-Overwriting-of-a-sell-order-leads-to-exfiltration-of-the-NFT)
+3. [Wrong check allows for decreasing fulfilled or cancelled orders amounts, leading to siphoning of funds](#3-Wrong-check-allows-for-decreasing-fulfilled-or-cancelled-orders-amounts-leading-to-siphoning-of-funds)
+
 ## 1. No validation that the poster of a sell order is the actual owner of the NFT
 ### Description
 When calling the `postSellOrder` function, the function only checks that the NFT id sent is valid but not that is belongs to the `msg.sender`. 
@@ -53,7 +58,7 @@ As a consequence of [[1]](#1-No-validation-that-the-poster-of-a-sell-order-is-th
 
 This allows the poster to then cancel the order through the `cancelSellOrder` function which doesn't check that the `msg.sender` is the owner of the NFT but only if it's the owner of the sell order. 
 
-Hence, an attacker can steal any NFT listed on the marketplace.
+Hence, an attacker can steal any NFT approved to the marketplace.
 
 ### Code
 ```
@@ -119,7 +124,7 @@ require(
 );
 ```
 
-This bug allows for an attacker to submit a buy order, cancel it to get refunded and then descrease its amount to withdraw additional tokens from the contract.
+This bug allows for an attacker to submit a buy order, cancel it to get refunded and then decrease its amount to withdraw additional tokens from the contract.
 
 This can be repeated until one token remains in the balance of the marketplace as the strict equality (`require(decreaseAmount > 0, "decreaseAmount > 0")` line 267) won't allow to post an 1 token order and decrease its value.
 
