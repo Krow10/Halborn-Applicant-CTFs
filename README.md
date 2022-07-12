@@ -1,4 +1,16 @@
+# Halborn-Applicant-CTFs
 
+Taking up the challenge of finding Solidity exploits !
+
+## Why ?
+
+I came across these CTFs while looking to apply for an internship at [Halborn](https://halborn.com/) and thought I might give it a try to test myself against a real interview challenge.
+
+There are several CTFs available but I chose to focus on Solidity related challenges since this is what I'm most familiar with at the moment. It also gives me the opportunity to practice with the Hardhat environnement and write tests files on my own after being carried by the nice setup of the [damn-vulnerable-defi](https://github.com/Krow10/damn-vulnerable-defi) challenges.
+
+## What ?
+
+Two vulnerable contracts are provided and a report on each of them can be found in their respective folders. In addition, a Javascript test file can be run from each folder (`yarn hardhat test`) to demonstrate the vulnerabilities described in the reports.
 
 # Forked original README.md
 

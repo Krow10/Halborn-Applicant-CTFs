@@ -1,3 +1,9 @@
+I chose to stick with Hardhat for testing as I don't feel to start jumping on different developement environnement before I fully understand at least one of them.
+
+Although I'm familiar with Python and should not be too much trouble to make it work with Brownie, I want to continue experimenting with Hardhat and practice some more Javascript / Typescript.
+
+# Forked original README.md
+
 ## Solidity EVM CTF
 
 Two CTFs are included here:
