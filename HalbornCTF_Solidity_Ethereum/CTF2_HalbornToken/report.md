@@ -10,7 +10,7 @@
 ### Description
 The `root` variable set in the constructor is constructed in a way similar to a [Merkle Tree root](https://ethereum.org/en/developers/docs/data-structures-and-encoding/patricia-merkle-trie/) to only allow certain addresses (presenting a valid proof) for minting tokens.
 
-This is how the `mintTokensWithWhitelist` function is supposed to work. However, for unknown reasons, the function sends a user supplied `_root` parameter to the `verify` function, in charge of validating the `msg.sender` and proof(s) associated with it.
+This is how the `mintTokensWithWhitelist` function is supposed to work. However, instead of using the storage `root` variable, the function sends a user supplied `_root` parameter to the `verify` function in charge of validating the `msg.sender` and proof(s) associated with it.
 
 This means an attacker can send his own `_root` and `proof` to pass the validation function, resulting in the minting of an arbitrary amount of tokens for the attacker.
 
