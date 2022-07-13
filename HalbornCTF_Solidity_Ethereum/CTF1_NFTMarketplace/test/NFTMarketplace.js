@@ -72,7 +72,7 @@ describe('[NFTMarketplace] Exploits', function() {
 		).to.be.equal(attacker.address); // Attacker is now the owner of the NFT for free !
 	});
 
-	it ('[Exploit #3] Wrong check leads to siphoning of funds', async function() {
+	it('[Exploit #3] Wrong check leads to siphoning of funds', async function() {
 		let marketplaceFunds = ethers.utils.parseEther('100000');
 		let attackerFunds = ethers.utils.parseEther('1');
 
