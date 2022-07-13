@@ -2,7 +2,7 @@ const { ethers } = require('hardhat');
 const { expect } = require('chai');
 
 describe('[NFTMarketplace] Exploits', function() {
-	let deployer, governance, users, attacker; // 'attacker' and 'attacker_2' represents two addresses controlled by the attacker
+	let deployer, governance, users, attacker;
 
 	beforeEach(async function() {
 		[deployer, governance, alice, bob, charlie, attacker] = await ethers.getSigners();

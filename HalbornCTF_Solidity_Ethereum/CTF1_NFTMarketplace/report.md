@@ -10,9 +10,11 @@
 ## 1. No validation that the poster of a sell order is the actual owner of the NFT
 *Severity: Critical*
 ### Description
-When calling the `postSellOrder` function, the function only checks that the NFT id sent is valid but not that is belongs to the `msg.sender`. 
+When calling the `postSellOrder` function, the function only checks that the `nftId` sent is valid but not that is belongs to the `msg.sender`. 
 
-This allows anyone to post a sell order for any NFT id, even if a sell order has already been posted for that NFT since the contract associate only one NFT id to one sell order (`mapping(uint256 => Order) public sellOrder` line 89).
+This allows anyone to post a sell order for any `nftId`, even if a sell order has already been posted for that NFT since it is expected behavior that one `nftId` is associated to only one sell order (`mapping(uint256 => Order) public sellOrder` line 89).
+
+An attacker could leverage this by posting a sell order with a very low amount that he/she could immediatly fulfill after, leaving the actual NFT owner without a say in the matter !
 
 ### Code
 ```
@@ -53,7 +55,7 @@ require(
     );
 ```
 **Future:**
-- Consider using an approval system for posting selling orders *or* validating buy orders that would require an additional step from the owner before sending the NFT.
+- Consider using an approval system for posting selling orders *and/or* validating buy orders that would require an additional step from the NFT owner before sending its NFT.
 
 ## 2. Overwriting of a sell order leads to exfiltration of the NFT
 *Severity: Critical*
