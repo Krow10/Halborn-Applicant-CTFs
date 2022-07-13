@@ -2,7 +2,8 @@
 
 ## Table of Contents
 1. [`root` variable of the contract is set but never used](#1-root-variable-of-the-contract-is-set-but-never-used)
-2. [`mintTokensWithSignature` is vulnerable to replay attacks](#2-mintTokensWithSignature-is-vulnerable-to-replay-attacks)
+2. [Logic bug enables anyone to become the new `signer`](#2-Logic-bug-enables-anyone-to-become-the-new-signer)
+3. [`mintTokensWithSignature` is vulnerable to replay attacks](#3-mintTokensWithSignature-is-vulnerable-to-replay-attacks)
 
 ## 1. `root` variable of the contract is set but never used
 *Severity: Critical*
@@ -29,7 +30,39 @@ function mintTokensWithWhitelist(uint256 amount, bytes32 _root, bytes32[] memory
 - Simplify the whitelisting process by providing directly a list of addresses to the constructor or to a function using the [Initializable](https://docs.openzeppelin.com/contracts/4.x/api/proxy#Initializable) modifier.
 - Consider using proven and more secure alternatives for whitelisting users such as [Access Control contracts](https://docs.openzeppelin.com/contracts/4.x/api/access).
 
-## 2. `mintTokensWithSignature` is vulnerable to replay attacks
+## 2. Logic bug enables anyone to become the new `signer`
+*Severity: Critical*
+### Description
+The `setSigner` function `require` statement wrongly checks that the `msg.sender` is the current `signer`.
+```
+require (msg.sender != signer, "You are not the current signer");
+```
+should be
+```
+require (msg.sender == signer, "You are not the current signer");
+```
+
+This allows anyone calling the function to become the new `signer` which can be used to approve any address for minting new tokens via the `mintTokensWithSignature` function.
+
+### Code
+```
+function setSigner(address _newSigner) public {
+    require (msg.sender != signer, "You are not the current signer");
+    signer = _newSigner;
+}
+```
+
+### Recommendations
+**Immediate:** Change the `require` statement to the proper check:
+```
+require (msg.sender == signer, "You are not the current signer");
+``` 
+
+**Future:**
+- Carefully review the flow of execution and `require` statements of critical functions (handling funds, ownership, etc.).
+- Consider using a [formal verification tool](https://github.com/leonardoalt/ethereum_formal_verification_overview#solidity) for asserting function's behavior before deploying smart contracts.
+
+## 3. `mintTokensWithSignature` is vulnerable to replay attacks
 *Severity: High*
 ### Description
 The `mintTokensWithSignature` function checks for the valid signature of the `signer` (set during the deployement of the contract) before minting tokens to the `msg.sender`.
